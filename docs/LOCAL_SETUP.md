@@ -13,6 +13,22 @@ Install and authenticate these CLIs using their official instructions:
 - Claude CLI: command `claude`; keep your existing DeepSeek API/backend mapping.
 - Cursor CLI: command `cursor-agent` or `agent`; let Cursor use your plan's default/Auto model.
 - Codex CLI: command `codex`; AutoAgent adds two named safety profiles but does not alter login credentials.
+- MiniMax CLI: command `mmx`; uses your MiniMax Token Plan and acts as a pre-planning Challenger.
+
+`install.sh` installs the official `mmx-cli` when it is absent. Authentication remains an explicit local action:
+
+```bash
+mmx auth login
+mmx auth status
+mmx quota
+```
+
+The CLI normally detects Global/CN from your login. If an authenticated call returns 401, set the region that matches the subscription you purchased:
+
+```bash
+mmx config set --key region --value global
+# or: mmx config set --key region --value cn
+```
 
 ## 2. Install AutoAgent
 
@@ -32,6 +48,7 @@ source ~/.zshrc
 The installer:
 
 - installs/updates CAO from its upstream `main` branch through `uv`;
+- installs the official MiniMax `mmx-cli` through npm when missing;
 - installs five CAO profiles;
 - copies the launcher and schemas to `~/.local`;
 - adds missing `autoagent_readonly` and `autoagent_tester` profiles to `~/.codex/config.toml` after creating a backup.
@@ -45,7 +62,7 @@ autoagent doctor
 autoagent doctor --live
 ```
 
-The first command only checks executables/configuration. `--live` sends a tiny prompt through Claude, Cursor, and Codex, so it consumes some subscription/API quota.
+The first command only checks executables/configuration and MiniMax auth state. `--live` sends a tiny prompt through Claude, Cursor, Codex, and MiniMax, so it consumes some subscription/API quota.
 
 When Cursor CLI is invoked over SSH on macOS, its login keychain may be locked. Unlock it interactively on your machine, then rerun the live check:
 
@@ -75,9 +92,13 @@ autoagent status [run-id]
 autoagent attach [run-id]
 autoagent report [run-id]
 autoagent stop [run-id]
+autoagent minimax status
+autoagent minimax quota
 ```
 
 If a run is `BLOCKED`, inspect its report and attach to the manager session. v0.1 intentionally does not guess product decisions or provide a command that deletes run data.
+
+MiniMax runs once before CAO planning and writes `minimax-advice.md` in the run directory. It is advisory data: Claude/DeepSeek does not blindly follow it, and Codex Planner must validate it against the repository. Use `AUTOAGENT_MINIMAX=off` to skip it or `AUTOAGENT_MINIMAX=always` to make its failure block task startup.
 
 ## 5. Accept the result
 

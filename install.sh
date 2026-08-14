@@ -25,6 +25,13 @@ PY
 say "安装/更新 CLI Agent Orchestrator..."
 uv tool install git+https://github.com/awslabs/cli-agent-orchestrator.git@main --upgrade
 
+if ! has mmx; then
+  has node || die "安装 MiniMax CLI 需要 Node.js 18+"
+  has npm || die "安装 MiniMax CLI 需要 npm"
+  say "安装官方 MiniMax CLI..."
+  npm install -g mmx-cli
+fi
+
 mkdir -p "$BIN_DIR" "$SHARE_DIR/profiles" "$SHARE_DIR/schemas" "$HOME/.codex"
 install -m 0755 "$ROOT_DIR/bin/autoagent" "$BIN_DIR/autoagent"
 install -m 0644 "$ROOT_DIR/VERSION" "$SHARE_DIR/VERSION"
@@ -73,3 +80,7 @@ case ":$PATH:" in
 esac
 say "下一步：autoagent doctor"
 say "真实模型连通检查：autoagent doctor --live（会消耗少量额度）"
+if ! mmx auth status >/dev/null 2>&1; then
+  say "MiniMax 尚未登录：请在本机交互执行 mmx auth login"
+  say "不要把 API Key 或登录凭据粘贴到聊天或仓库。"
+fi
