@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+AUTOAGENT_VERSION="0.1.0"
+AUTOAGENT_HOME="${AUTOAGENT_HOME:-$HOME/.local/share/autoagent}"
+AUTOAGENT_CAO_URL="${AUTOAGENT_CAO_URL:-http://127.0.0.1:9889}"
+MAX_CYCLES="${AUTOAGENT_MAX_CYCLES:-3}"
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'autoagent: %s\n' "$*" >&2; exit 1; }
+has() { command -v "$1" >/dev/null 2>&1; }
+
+usage() {
+  cat <<'EOF'
+AutoAgent 0.1.0 — Claude/DeepSeek 管理，Cursor 开发，Codex 规划/测试/复审
+
+Usage:
+  autoagent doctor [--live]
+  autoagent run "需求"
+  autoagent status [run-id]
+  autoagent attach [run-id]
+  autoagent report [run-id]
+  autoagent stop [run-id]
+  autoagent list
+  autoagent version
+EOF
+}
+
+runs_dir() { printf '%s/runs' "$AUTOAGENT_HOME"; }
+latest_file() { printf '%s/latest-run' "$AUTOAGENT_HOME"; }
+
+resolve_run_id() {
+  local requested="${1:-}"
+  if [[ -n "$requested" ]]; then
+    printf '%s' "$requested"
+  elif [[ -f "$(latest_file)" ]]; then
+    tr -d '\n' < "$(latest_file)"
+  else
+    die "没有可用的 run-id。先执行 autoagent run，或显式传入 run-id"
+  fi
+}
+
+meta_field() {
+  local meta="$1" field="$2"
+  python3 - "$meta" "$field" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    value = json.load(f)
+for part in sys.argv[2].split("."):
+    value = value[part]
+print(value)
+PY
+}
+
+check_command() {
+  local command="$1" label="${2:-$1}"
+  if has "$command"; then
+    printf '  [ok]   %-14s %s\n' "$label" "$(command -v "$command")"
+    return 0
+  fi
+  printf '  [miss] %-14s 未找到\n' "$label"
+  return 1
+}
+
+live_probe() {
+  local label="$1"
+  shift
+  local output status
+  set +e
+  output=$("$@" 2>&1)
+  status=$?
+  set -e
+  if [[ $status -eq 0 ]] && grep -q 'AUTOAGENT_OK' <<<"$output"; then
+    printf '  [ok]   %-14s 模型调用成功\n' "$label"
+    return 0
+  fi
+  printf '  [fail] %-14s 调用失败（exit=%s）\n' "$label" "$status"
+  if grep -Eqi 'keychain|user interaction is not allowed|security' <<<"$output"; then
+    say '         可能是 macOS 登录钥匙串未解锁：'
+    say '         security unlock-keychain "$HOME/Library/Keychains/login.keychain-db"'
+  else
+    printf '         %s\n' "$(printf '%s' "$output" | tail -n 3 | tr '\n' ' ')"
+  fi
+  return 1
+}
+
+doctor() {
+  local live=false missing=0
+  [[ "${1:-}" == "--live" ]] && live=true
+  [[ -n "${1:-}" && "${1:-}" != "--live" ]] && die "doctor 只接受 --live"
+
+  say "AutoAgent doctor"
+  check_command git || missing=1
+  check_command python3 || missing=1
+  check_command curl || missing=1
+  check_command tmux || missing=1
+  check_command uv || missing=1
+  check_command cao || missing=1
+  check_command cao-server || missing=1
+  check_command claude || missing=1
+  check_command codex || missing=1
+
+  local cursor_command=""
+  if has cursor-agent; then
+    cursor_command="cursor-agent"
+    check_command cursor-agent "Cursor CLI"
+  elif has agent; then
+    cursor_command="agent"
+    check_command agent "Cursor CLI"
+  else
+    printf '  [miss] %-14s 未找到 cursor-agent 或 agent\n' "Cursor CLI"
+    missing=1
+  fi
+
+  local codex_config="$HOME/.codex/config.toml"
+  if [[ -f "$codex_config" ]] && grep -q '^\[profiles\.autoagent_readonly\]' "$codex_config" && grep -q '^\[profiles\.autoagent_tester\]' "$codex_config"; then
+    say '  [ok]   Codex profiles 安全配置已安装'
+  else
+    say '  [miss] Codex profiles 未安装；请重新运行 install.sh'
+    missing=1
+  fi
+
+  if [[ "$live" == true ]]; then
+    say
+    say 'Live probes（会消耗少量模型额度）'
+    [[ $missing -eq 0 ]] || die "基础检查未通过，跳过 live probes"
+    local failed=0
+    live_probe "Claude" claude -p "Reply exactly AUTOAGENT_OK" || failed=1
+    live_probe "Cursor" "$cursor_command" --print "Reply exactly AUTOAGENT_OK" || failed=1
+    live_probe "Codex" codex exec --ephemeral --sandbox read-only --ask-for-approval never "Reply exactly AUTOAGENT_OK" || failed=1
+    [[ $failed -eq 0 ]] || die "至少一个 live probe 失败"
+  fi
+
+  [[ $missing -eq 0 ]] || die "依赖不完整。macOS 可先执行：brew install uv tmux"
+  say '检查通过。'
+}
+
+ensure_server() {
+  if curl -fsS "$AUTOAGENT_CAO_URL/openapi.json" >/dev/null 2>&1; then
+    return 0
+  fi
+  mkdir -p "$AUTOAGENT_HOME/logs"
+  say "正在启动 CAO server..."
+  nohup cao-server >"$AUTOAGENT_HOME/logs/cao-server.log" 2>&1 &
+  local attempt
+  for attempt in {1..30}; do
+    if curl -fsS "$AUTOAGENT_CAO_URL/openapi.json" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  die "CAO server 未就绪。查看 $AUTOAGENT_HOME/logs/cao-server.log"
+}
+
+run_task() {
+  local requirement="${1:-}"
+  [[ -n "$requirement" ]] || die '用法：autoagent run "需求"'
+  has git || die "未找到 git"
+  has cao || die "未找到 cao；请先运行 install.sh"
+  has cao-server || die "未找到 cao-server；请先运行 install.sh"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "当前目录不是 Git 仓库"
+  [[ -z "$(git status --porcelain)" ]] || die "当前 Git 工作区不干净。请先提交或暂存你的改动"
+
+  local repo_root repo_name base_sha stamp digest run_id branch run_dir worktree session_name
+  repo_root=$(git rev-parse --show-toplevel)
+  repo_name=$(basename "$repo_root")
+  base_sha=$(git -C "$repo_root" rev-parse HEAD)
+  stamp=$(date '+%Y%m%d-%H%M%S')
+  digest=$(printf '%s' "$requirement" | cksum | awk '{print $1}' | cut -c1-6)
+  run_id="${stamp}-${digest}"
+  branch="autoagent/${run_id}"
+  run_dir="$(runs_dir)/${run_id}"
+  worktree="$AUTOAGENT_HOME/worktrees/${repo_name}/${run_id}"
+  session_name="autoagent-${run_id}"
+
+  mkdir -p "$run_dir" "$(dirname "$worktree")"
+  git -C "$repo_root" worktree add -b "$branch" "$worktree" "$base_sha"
+
+  python3 - "$run_dir/meta.json" "$run_id" "$requirement" "$repo_root" "$worktree" "$branch" "$base_sha" "$session_name" "$MAX_CYCLES" <<'PY'
+import datetime, json, sys
+path, run_id, requirement, repo, worktree, branch, base, session, cycles = sys.argv[1:]
+data = {
+    "schema_version": "autoagent.run/v1",
+    "run_id": run_id,
+    "created_at": datetime.datetime.now().astimezone().isoformat(),
+    "requirement": requirement,
+    "repository": repo,
+    "worktree": worktree,
+    "branch": branch,
+    "base_sha": base,
+    "session_name": session,
+    "max_cycles": int(cycles),
+    "status": "CREATED"
+}
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PY
+  printf '%s\n' "$requirement" > "$run_dir/request.md"
+  printf '%s\n' "$run_id" > "$(latest_file)"
+
+  ensure_server
+
+  local message launch_output
+  message=$(cat <<EOF
+Run the AutoAgent state machine now.
+
+RUN_ID: $run_id
+WORKTREE: $worktree
+RUN_DIR: $run_dir
+MAX_CYCLES: $MAX_CYCLES
+BASE_SHA: $base_sha
+BRANCH: $branch
+
+USER_REQUIREMENT:
+$requirement
+
+Remain the manager; delegate planning, implementation, testing, and review to the installed AutoAgent worker profiles. Never push, merge, deploy, read credentials, or delete the worktree. Persist the plan, gate results, status, and final report in RUN_DIR.
+EOF
+)
+
+  set +e
+  launch_output=$(cao launch "$message" --agents autoagent_manager --headless --async --auto-approve --working-directory "$worktree" --session-name "$session_name" 2>&1)
+  local launch_status=$?
+  set -e
+  printf '%s\n' "$launch_output" > "$run_dir/launch.log"
+  if [[ $launch_status -ne 0 ]]; then
+    say "启动失败，但 worktree 和运行记录已保留：$worktree"
+    die "查看 $run_dir/launch.log"
+  fi
+
+  say "任务已提交：$run_id"
+  say "分支：$branch"
+  say "worktree：$worktree"
+  say "Web UI：$AUTOAGENT_CAO_URL"
+  say "状态：autoagent status $run_id"
+  say "接管：autoagent attach $run_id"
+  say "报告：autoagent report $run_id"
+}
+
+status_task() {
+  local run_id run_dir meta session
+  run_id=$(resolve_run_id "${1:-}")
+  run_dir="$(runs_dir)/$run_id"
+  meta="$run_dir/meta.json"
+  [[ -f "$meta" ]] || die "找不到运行记录：$run_id"
+  session=$(meta_field "$meta" session_name)
+  say "run-id:    $run_id"
+  say "branch:    $(meta_field "$meta" branch)"
+  say "worktree:  $(meta_field "$meta" worktree)"
+  if tmux has-session -t "$session" 2>/dev/null; then
+    say "session:   running ($session)"
+  else
+    say "session:   not running ($session)"
+  fi
+  if [[ -f "$run_dir/status.json" ]]; then
+    say "state:     $(python3 - "$run_dir/status.json" <<'PY'
+import json, sys
+try:
+    print(json.load(open(sys.argv[1], encoding="utf-8")).get("state", "unknown"))
+except Exception:
+    print("invalid status.json")
+PY
+)"
+  elif [[ -f "$run_dir/final-report.md" ]]; then
+    say "state:     report ready"
+  else
+    say "state:     launched; manager has not written status yet"
+  fi
+  say "files:     $run_dir"
+}
+
+attach_task() {
+  local run_id meta session
+  run_id=$(resolve_run_id "${1:-}")
+  meta="$(runs_dir)/$run_id/meta.json"
+  [[ -f "$meta" ]] || die "找不到运行记录：$run_id"
+  session=$(meta_field "$meta" session_name)
+  tmux has-session -t "$session" 2>/dev/null || die "会话未运行：$session"
+  exec tmux attach-session -t "$session"
+}
+
+report_task() {
+  local run_id report
+  run_id=$(resolve_run_id "${1:-}")
+  report="$(runs_dir)/$run_id/final-report.md"
+  [[ -f "$report" ]] || die "最终报告尚未生成。先执行 autoagent status $run_id"
+  cat "$report"
+}
+
+stop_task() {
+  local run_id meta session
+  run_id=$(resolve_run_id "${1:-}")
+  meta="$(runs_dir)/$run_id/meta.json"
+  [[ -f "$meta" ]] || die "找不到运行记录：$run_id"
+  session=$(meta_field "$meta" session_name)
+  if cao shutdown --session "$session"; then
+    say "已停止会话；worktree、分支和运行记录均已保留。"
+  else
+    die "停止失败或会话已不存在：$session"
+  fi
+}
+
+list_runs() {
+  local dir
+  dir=$(runs_dir)
+  [[ -d "$dir" ]] || { say "暂无运行记录。"; return 0; }
+  find "$dir" -mindepth 1 -maxdepth 1 -type d -print | sort -r | while IFS= read -r path; do
+    local meta="$path/meta.json"
+    if [[ -f "$meta" ]]; then
+      printf '%s  %s\n' "$(basename "$path")" "$(meta_field "$meta" branch)"
+    fi
+  done
+}
+
+main() {
+  local command="${1:-help}"
+  shift || true
+  case "$command" in
+    doctor) doctor "$@" ;;
+    run) run_task "$@" ;;
+    status) status_task "$@" ;;
+    attach) attach_task "$@" ;;
+    report) report_task "$@" ;;
+    stop) stop_task "$@" ;;
+    list) list_runs ;;
+    version|--version|-V) say "$AUTOAGENT_VERSION" ;;
+    help|--help|-h) usage ;;
+    *) usage >&2; die "未知命令：$command" ;;
+  esac
+}
+
+main "$@"

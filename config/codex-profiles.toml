@@ -1,0 +1,10 @@
+# install.sh 会把缺失的两个 profile 追加到 ~/.codex/config.toml。
+# 已存在的同名 profile 不会被覆盖。
+
+[profiles.autoagent_readonly]
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+[profiles.autoagent_tester]
+approval_policy = "never"
+sandbox_mode = "workspace-write"

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rambo586/autoagent/schemas/handoff.schema.json",
+  "title": "AutoAgent Handoff v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "iteration", "from", "to", "goal", "payload"],
+  "properties": {
+    "schema_version": {"const": "autoagent.handoff/v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "iteration": {"type": "integer", "minimum": 0},
+    "from": {"type": "string", "minLength": 1},
+    "to": {"type": "string", "minLength": 1},
+    "goal": {"type": "string", "minLength": 1},
+    "payload": {
+      "type": "object",
+      "required": ["summary", "acceptance_criteria"],
+      "properties": {
+        "summary": {"type": "string"},
+        "tasks": {"type": "array", "items": {"type": "object"}},
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "criterion"],
+            "properties": {
+              "id": {"type": "string"},
+              "criterion": {"type": "string"},
+              "verification": {"type": "string"}
+            }
+          }
+        },
+        "constraints": {"type": "array", "items": {"type": "string"}},
+        "uncertainties": {"type": "array", "items": {"type": "string"}},
+        "artifacts": {"type": "array", "items": {"type": "object"}}
+      }
+    }
+  }
+}
