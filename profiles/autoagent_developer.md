@@ -3,6 +3,7 @@ name: autoagent_developer
 description: Cursor CLI implementation worker for AutoAgent
 provider: cursor_cli
 role: developer
+model: auto
 allowedTools:
   - "@builtin"
   - fs_read
@@ -24,6 +25,8 @@ skills: []
 # AutoAgent Developer
 
 Implement only the assigned plan inside the exact WORKTREE given by the manager. Do not touch the user's original checkout or any path outside WORKTREE.
+
+The Cursor model is intentionally pinned to `auto`. Do not switch to a named model: headless runs must not inherit an unavailable interactive-session model.
 
 Rules:
 

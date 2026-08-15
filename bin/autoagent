@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AUTOAGENT_VERSION="0.1.1"
+AUTOAGENT_VERSION="0.1.2"
 AUTOAGENT_HOME="${AUTOAGENT_HOME:-$HOME/.local/share/autoagent}"
 AUTOAGENT_CAO_URL="${AUTOAGENT_CAO_URL:-http://127.0.0.1:9889}"
 MAX_CYCLES="${AUTOAGENT_MAX_CYCLES:-3}"
@@ -13,7 +13,7 @@ has() { command -v "$1" >/dev/null 2>&1; }
 
 usage() {
   cat <<'EOF'
-AutoAgent 0.1.1 — Claude/DeepSeek 管理，Cursor 开发，Codex 质量门，MiniMax 提前质疑
+AutoAgent 0.1.2 — Claude/DeepSeek 管理，Cursor 开发，Codex 质量门，MiniMax 提前质疑
 
 Usage:
   autoagent doctor [--live]
@@ -138,7 +138,7 @@ doctor() {
     [[ $missing -eq 0 ]] || die "基础检查未通过，跳过 live probes"
     local failed=0
     live_probe "Claude" claude -p "Reply exactly AUTOAGENT_OK" || failed=1
-    live_probe "Cursor" "$cursor_command" --trust --print "Reply exactly AUTOAGENT_OK" || failed=1
+    live_probe "Cursor" "$cursor_command" --trust --print --model auto "Reply exactly AUTOAGENT_OK" || failed=1
     live_probe "Codex" codex --ask-for-approval never exec --ephemeral --sandbox read-only --skip-git-repo-check "Reply exactly AUTOAGENT_OK" || failed=1
     live_probe "MiniMax" env MINIMAX_OUTPUT=text mmx text chat --message "Reply exactly AUTOAGENT_OK" || failed=1
     [[ $failed -eq 0 ]] || die "至少一个 live probe 失败"

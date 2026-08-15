@@ -11,7 +11,7 @@ AutoAgent 基于 [AWS Labs CLI Agent Orchestrator (CAO)](https://github.com/awsl
 | Challenger | MiniMax `mmx` | 在规划前找歧义、遗漏验收项、边界和交付风险 |
 | Manager | Claude CLI / 你的 DeepSeek 后端 | 拆派、答疑、控制循环、最终汇报 |
 | Planner | Codex CLI（只读） | 分析需求、制定验收标准和实施方案 |
-| Developer | Cursor CLI（Auto/默认模型） | 编码、修复、向 Manager 提问 |
+| Developer | Cursor CLI（固定 Auto） | 编码、修复、向 Manager 提问 |
 | Tester | Codex CLI（workspace-write） | 执行测试、收集证据、给出质量门结果 |
 | Reviewer | Codex CLI（只读） | 独立复审风险和验收完整性 |
 
@@ -62,8 +62,9 @@ Web 控制台默认位于 <http://127.0.0.1:9889>。完整本地配置见 [docs/
 - 默认不 push、不 merge、不创建 PR、不部署；最终分支由你检查后自行处理。
 - Planner 与 Reviewer 使用 Codex `read-only` 沙箱；Tester 使用 `workspace-write` 以允许测试生成缓存和构建产物。
 - Cursor CLI 在 CAO 当前版本中会自动批准工具调用。独立 worktree 防止直接污染原分支，但它不是操作系统级沙箱；只对可信仓库使用。
+- Cursor 的 Live Probe 和 Developer profile 都显式使用 `model: auto`，避免无头任务继承交互会话中的命名模型并触发套餐权限错误。
 - `autoagent stop` 只终止会话，不删除 worktree 或分支，便于恢复和审计。
-- CAO 当前没有原生 `mmx` provider；MiniMax 在 v0.1.1 中是前置 Challenger，不被伪装成可收发 CAO 消息的 worker。
+- CAO 当前没有原生 `mmx` provider；MiniMax 在 v0.1.2 中是前置 Challenger，不被伪装成可收发 CAO 消息的 worker。
 
 MiniMax 默认模式是 `auto`：可用时调用，失败时继续。可按任务关闭或强制成功：
 

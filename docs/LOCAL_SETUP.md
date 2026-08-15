@@ -11,7 +11,7 @@ git --version
 Install and authenticate these CLIs using their official instructions:
 
 - Claude CLI: command `claude`; keep your existing DeepSeek API/backend mapping.
-- Cursor CLI: command `cursor-agent` or `agent`; let Cursor use your plan's default/Auto model.
+- Cursor CLI: command `cursor-agent` or `agent`; AutoAgent explicitly pins headless calls to Cursor's `auto` model.
 - Codex CLI: command `codex`; AutoAgent adds two named safety profiles but does not alter login credentials.
 - MiniMax CLI: command `mmx`; uses your MiniMax Token Plan and acts as a pre-planning Challenger.
 
@@ -63,6 +63,14 @@ autoagent doctor --live
 ```
 
 The first command only checks executables/configuration and MiniMax auth state. `--live` sends a tiny prompt through Claude, Cursor, Codex, and MiniMax, so it consumes some subscription/API quota.
+
+AutoAgent calls Cursor with `--model auto`. To isolate Cursor authentication or entitlement problems, run the same probe directly:
+
+```bash
+cursor-agent --trust --print --model auto "Reply exactly AUTOAGENT_OK"
+```
+
+If that direct Auto probe still reports the wrong plan, refresh the Cursor CLI login with `cursor-agent logout` followed by `cursor-agent login`, making sure the browser signs in to the account that owns Ultra.
 
 When Cursor CLI is invoked over SSH on macOS, its login keychain may be locked. Unlock it interactively on your machine, then rerun the live check:
 

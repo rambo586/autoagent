@@ -27,11 +27,14 @@ for name, provider in expected.items():
     assert re.search(rf"^provider: {re.escape(provider)}$", text, re.M), name
     assert "@cao-mcp-server" in text, name
 
+developer = (root / "profiles/autoagent_developer.md").read_text(encoding="utf-8")
+assert re.search(r"^model: auto$", developer, re.M)
+
 gate = json.loads((root / "schemas/gate-result.schema.json").read_text())
 assert gate["properties"]["verdict"]["enum"] == ["pass", "fail", "partial", "timeout"]
 
 launcher = (root / "bin/autoagent").read_text(encoding="utf-8")
-assert '"$cursor_command" --trust --print' in launcher
+assert '"$cursor_command" --trust --print --model auto' in launcher
 assert 'codex --ask-for-approval never exec' in launcher
 assert 'mmx text chat' in launcher
 assert 'mmx auth status' in launcher
@@ -39,7 +42,7 @@ for forbidden in ("git push", "git merge", "rm -rf", "security find-generic-pass
     assert forbidden not in launcher, forbidden
 PY
 
-"$ROOT_DIR/bin/autoagent" --version | grep -Fx '0.1.1' >/dev/null
+"$ROOT_DIR/bin/autoagent" --version | grep -Fx '0.1.2' >/dev/null
 "$ROOT_DIR/bin/autoagent" --help | grep -F 'autoagent run' >/dev/null
 
 printf 'smoke tests passed\n'
