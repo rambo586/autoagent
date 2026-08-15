@@ -14,6 +14,7 @@ Install and authenticate these CLIs using their official instructions:
 - Cursor CLI: command `cursor-agent` or `agent`; AutoAgent explicitly pins headless calls to Cursor's `auto` model.
 - Codex CLI: command `codex`; AutoAgent adds two named safety profiles but does not alter login credentials.
 - MiniMax CLI: command `mmx`; uses your MiniMax Token Plan and acts as a pre-planning Challenger.
+- Google Antigravity CLI: command `agy`; uses the Google AI Pro account and acts as a pre-planning Researcher.
 
 `install.sh` installs the official `mmx-cli` when it is absent. Authentication remains an explicit local action:
 
@@ -22,6 +23,14 @@ mmx auth login
 mmx auth status
 mmx quota
 ```
+
+`install.sh` also installs the official Antigravity CLI when `agy` is absent. Complete its first-run authentication locally:
+
+```bash
+agy
+```
+
+Use the same Google account that owns the Google AI Pro subscription. Consumer subscriptions no longer use the legacy `gemini` CLI.
 
 The CLI normally detects Global/CN from your login. If an authenticated call returns 401, set the region that matches the subscription you purchased:
 
@@ -49,6 +58,7 @@ The installer:
 
 - installs/updates CAO from its upstream `main` branch through `uv`;
 - installs the official MiniMax `mmx-cli` through npm when missing;
+- installs the official Google Antigravity CLI through Google's installer when missing;
 - installs five CAO profiles;
 - copies the launcher and schemas to `~/.local`;
 - adds missing `autoagent_readonly` and `autoagent_tester` profiles to `~/.codex/config.toml` after creating a backup.
@@ -62,7 +72,13 @@ autoagent doctor
 autoagent doctor --live
 ```
 
-The first command only checks executables/configuration and MiniMax auth state. `--live` sends a tiny prompt through Claude, Cursor, Codex, and MiniMax, so it consumes some subscription/API quota.
+The first command only checks executables/configuration and MiniMax auth state. `--live` sends a tiny prompt through Claude, Cursor, Codex, MiniMax, and Antigravity, so it consumes some subscription/API quota.
+
+To isolate Antigravity authentication or entitlement problems, run its probe directly:
+
+```bash
+agy --sandbox --print --output-format text "Reply exactly AUTOAGENT_OK without using tools"
+```
 
 AutoAgent calls Cursor with `--model auto`. To isolate Cursor authentication or entitlement problems, run the same probe directly:
 
@@ -106,7 +122,7 @@ autoagent minimax quota
 
 If a run is `BLOCKED`, inspect its report and attach to the manager session. v0.1 intentionally does not guess product decisions or provide a command that deletes run data.
 
-MiniMax runs once before CAO planning and writes `minimax-advice.md` in the run directory. It is advisory data: Claude/DeepSeek does not blindly follow it, and Codex Planner must validate it against the repository. Use `AUTOAGENT_MINIMAX=off` to skip it or `AUTOAGENT_MINIMAX=always` to make its failure block task startup.
+MiniMax runs once before CAO planning and writes `minimax-advice.md`; Antigravity writes `antigravity-advice.md`. Both are advisory data: Claude/DeepSeek does not blindly follow them, and Codex Planner must validate them against the repository. Use `AUTOAGENT_MINIMAX=off` or `AUTOAGENT_ANTIGRAVITY=off` to skip either pass; set either variable to `always` to make that provider's failure block task startup.
 
 ## 5. Accept the result
 

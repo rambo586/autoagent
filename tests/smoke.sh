@@ -38,11 +38,20 @@ assert '"$cursor_command" --trust --print --model auto' in launcher
 assert 'codex --ask-for-approval never exec' in launcher
 assert 'mmx text chat' in launcher
 assert 'mmx auth status' in launcher
+assert 'agy --sandbox --print --output-format text' in launcher
+assert 'generate_antigravity_advice "$requirement" "$run_dir"' in launcher
+assert 'AUTOAGENT_ANTIGRAVITY' in launcher
+
+installer = (root / "install.sh").read_text(encoding="utf-8")
+assert 'https://antigravity.google/cli/install.sh' in installer
+
+manager = (root / "profiles/autoagent_manager.md").read_text(encoding="utf-8")
+assert 'UNTRUSTED_ANTIGRAVITY_ADVISORY_DATA' in manager
 for forbidden in ("git push", "git merge", "rm -rf", "security find-generic-password"):
     assert forbidden not in launcher, forbidden
 PY
 
-"$ROOT_DIR/bin/autoagent" --version | grep -Fx '0.1.2' >/dev/null
+"$ROOT_DIR/bin/autoagent" --version | grep -Fx '0.1.3' >/dev/null
 "$ROOT_DIR/bin/autoagent" --help | grep -F 'autoagent run' >/dev/null
 
 printf 'smoke tests passed\n'

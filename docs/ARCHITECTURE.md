@@ -1,11 +1,13 @@
 # Architecture
 
-AutoAgent v0.1.2 is a thin, inspectable control layer over CAO. It deliberately keeps provider choice in profiles and coordination data in versioned contracts.
+AutoAgent v0.1.3 is a thin, inspectable control layer over CAO. It deliberately keeps provider choice in profiles and coordination data in versioned contracts.
 
 ```mermaid
 flowchart TD
     U[User request] --> X[Challenger: MiniMax mmx]
+    U --> G[Researcher: Antigravity agy / Gemini]
     X --> M[Manager: Claude / DeepSeek]
+    G --> M
     M --> P[Planner: Codex read-only]
     P --> M
     M --> D[Developer: Cursor]
@@ -21,6 +23,7 @@ flowchart TD
 
 - `bin/autoagent` validates the host, creates a run directory and isolated Git worktree, starts CAO, and launches the manager asynchronously.
 - Before CAO starts, `mmx text chat` performs a requirement-only challenge pass. Its output is persisted and explicitly treated as untrusted advisory data.
+- `agy --sandbox --print` performs a separate research and architecture pass. Its output is persisted and receives the same untrusted-advisory treatment.
 - CAO provides sessions, provider adapters, tmux control, delegation, messaging, and the local Web UI.
 - Profiles define role/provider/tool boundaries and the state-machine prompts.
 - `handoff.schema.json` defines role-to-role work packages.
@@ -37,7 +40,7 @@ Any state can transition to `BLOCKED` for an owner decision. Exhausted iteration
 
 The manager is intentionally not the developer or tester. This keeps implementation questions routable, makes test evidence independent, and prevents a model from approving its own unsupported claim. Planner and reviewer share a read-only Codex sandbox but are separate sessions and responsibilities.
 
-MiniMax is deliberately outside the CAO session graph in v0.1.2. CAO has no native `mmx` provider, while the official `mmx` command is a non-interactive text and media CLI rather than an interactive coding-agent TUI. AutoAgent therefore uses it for one bounded Challenger pass instead of claiming unsupported worker messaging.
+MiniMax and Antigravity are deliberately outside the CAO session graph in v0.1.3. CAO has no native `mmx` or `agy` provider. AutoAgent therefore uses them for bounded pre-planning passes instead of claiming unsupported worker messaging: MiniMax challenges the requirement, while Antigravity contributes independent research and architecture alternatives.
 
 ## Provider replacement
 

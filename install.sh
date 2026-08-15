@@ -14,6 +14,7 @@ has() { command -v "$1" >/dev/null 2>&1; }
 [[ "$(uname -s)" == "Darwin" ]] || say "提示：v0.1 主要在 macOS 设计；将继续安装。"
 has python3 || die "缺少 python3（需要 3.10+）"
 has git || die "缺少 git"
+has curl || die "缺少 curl"
 has uv || die "缺少 uv。macOS 执行：brew install uv"
 has tmux || die "缺少 tmux。macOS 执行：brew install tmux"
 
@@ -30,6 +31,13 @@ if ! has mmx; then
   has npm || die "安装 MiniMax CLI 需要 npm"
   say "安装官方 MiniMax CLI..."
   npm install -g mmx-cli
+fi
+
+if ! has agy; then
+  say "安装官方 Google Antigravity CLI..."
+  curl -fsSL https://antigravity.google/cli/install.sh | bash
+  hash -r
+  has agy || die "Antigravity CLI 安装完成但当前 PATH 中未找到 agy；请确认 $HOME/.local/bin 已加入 PATH 后重试"
 fi
 
 mkdir -p "$BIN_DIR" "$SHARE_DIR/profiles" "$SHARE_DIR/schemas" "$HOME/.codex"
@@ -84,3 +92,4 @@ if ! mmx auth status >/dev/null 2>&1; then
   say "MiniMax 尚未登录：请在本机交互执行 mmx auth login"
   say "不要把 API Key 或登录凭据粘贴到聊天或仓库。"
 fi
+say "Antigravity 首次使用请执行 agy，并使用 Google AI Pro 对应账号完成登录。"
