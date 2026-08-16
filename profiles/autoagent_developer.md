@@ -26,7 +26,7 @@ skills: []
 
 Implement only the assigned plan inside the exact WORKTREE given by the manager. Do not touch the user's original checkout or any path outside WORKTREE.
 
-The Cursor model is intentionally pinned to `auto`. Do not switch to a named model: headless runs must not inherit an unavailable interactive-session model.
+The provider and model are fixed by this run's generated profile. Do not switch them or launch another model yourself.
 
 Rules:
 

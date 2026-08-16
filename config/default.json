@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "preset": "balanced",
+  "presets": {
+    "balanced": {
+      "max_cycles": 3,
+      "fallback_policy": "never",
+      "roles": {
+        "manager": {
+          "provider": "claude",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_manager"
+        },
+        "planner": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_planner",
+          "codex_profile": "autoagent_readonly"
+        },
+        "developer": {
+          "provider": "cursor",
+          "model": "auto",
+          "mode": "required",
+          "template": "autoagent_developer"
+        },
+        "tester": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_tester",
+          "codex_profile": "autoagent_tester"
+        },
+        "reviewer": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_reviewer",
+          "codex_profile": "autoagent_readonly"
+        },
+        "challenger": {
+          "provider": "minimax",
+          "model": "default",
+          "mode": "optional"
+        },
+        "researcher": {
+          "provider": "antigravity",
+          "model": "inherit",
+          "mode": "manual"
+        }
+      },
+      "specialists": []
+    },
+    "quality": {
+      "max_cycles": 4,
+      "fallback_policy": "never",
+      "roles": {
+        "manager": {
+          "provider": "claude",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_manager"
+        },
+        "planner": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_planner",
+          "codex_profile": "autoagent_readonly"
+        },
+        "developer": {
+          "provider": "cursor",
+          "model": "auto",
+          "mode": "required",
+          "template": "autoagent_developer"
+        },
+        "tester": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_tester",
+          "codex_profile": "autoagent_tester"
+        },
+        "reviewer": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_reviewer",
+          "codex_profile": "autoagent_readonly"
+        },
+        "challenger": {
+          "provider": "minimax",
+          "model": "default",
+          "mode": "optional"
+        },
+        "researcher": {
+          "provider": "antigravity",
+          "model": "inherit",
+          "mode": "manual"
+        }
+      },
+      "specialists": []
+    },
+    "fast": {
+      "max_cycles": 1,
+      "fallback_policy": "never",
+      "roles": {
+        "manager": {
+          "provider": "claude",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_manager"
+        },
+        "planner": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_planner",
+          "codex_profile": "autoagent_readonly"
+        },
+        "developer": {
+          "provider": "cursor",
+          "model": "auto",
+          "mode": "required",
+          "template": "autoagent_developer"
+        },
+        "tester": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_tester",
+          "codex_profile": "autoagent_tester"
+        },
+        "reviewer": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_reviewer",
+          "codex_profile": "autoagent_readonly"
+        },
+        "challenger": {
+          "provider": "minimax",
+          "model": "default",
+          "mode": "disabled"
+        },
+        "researcher": {
+          "provider": "antigravity",
+          "model": "inherit",
+          "mode": "manual"
+        }
+      },
+      "specialists": []
+    },
+    "quota-saver": {
+      "max_cycles": 2,
+      "fallback_policy": "never",
+      "roles": {
+        "manager": {
+          "provider": "claude",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_manager"
+        },
+        "planner": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_planner",
+          "codex_profile": "autoagent_readonly"
+        },
+        "developer": {
+          "provider": "cursor",
+          "model": "auto",
+          "mode": "required",
+          "template": "autoagent_developer"
+        },
+        "tester": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_tester",
+          "codex_profile": "autoagent_tester"
+        },
+        "reviewer": {
+          "provider": "codex",
+          "model": "inherit",
+          "mode": "required",
+          "template": "autoagent_reviewer",
+          "codex_profile": "autoagent_readonly"
+        },
+        "challenger": {
+          "provider": "minimax",
+          "model": "default",
+          "mode": "disabled"
+        },
+        "researcher": {
+          "provider": "antigravity",
+          "model": "inherit",
+          "mode": "manual"
+        }
+      },
+      "specialists": []
+    }
+  }
+}

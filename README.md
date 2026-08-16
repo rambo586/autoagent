@@ -1,102 +1,120 @@
 # AutoAgent
 
-一个能先用起来的多 Agent 开发闭环：你只提需求，MiniMax 先做独立需求质疑，Google Antigravity/Gemini 补充研究与架构意见，Claude CLI（可使用你现有的 DeepSeek 后端配置）负责总控，Cursor CLI 负责主力开发，Codex CLI 负责规划、测试和只读复审。
+AutoAgent 是一个本地多 Agent 开发闭环：你提需求，Manager 负责总牵头，Planner 拆解，Developer 实施，Tester 验证，Reviewer 独立复审，最后给你一份有证据的报告。
 
-AutoAgent 基于 [AWS Labs CLI Agent Orchestrator (CAO)](https://github.com/awslabs/cli-agent-orchestrator) 运行，不复制、不读取你的 API Key。每次任务创建独立 Git worktree 和分支，默认不 push、不 merge、不部署。
+它基于 [AWS Labs CLI Agent Orchestrator (CAO)](https://github.com/awslabs/cli-agent-orchestrator)，不复制或保存你的 API Key。每个任务都在独立 Git worktree 和分支中运行，默认不 push、不 merge、不部署。
 
-## 当前角色
+## 默认分工
 
-| 角色 | 默认客户端 | 职责 |
+| 角色 | 默认客户端 | 作用 |
 |---|---|---|
-| Challenger | MiniMax `mmx` | 在规划前找歧义、遗漏验收项、边界和交付风险 |
-| Researcher | Google Antigravity `agy` / Gemini | 提供独立研究、架构选项和待核实外部事实 |
-| Manager | Claude CLI / 你的 DeepSeek 后端 | 拆派、答疑、控制循环、最终汇报 |
-| Planner | Codex CLI（只读） | 分析需求、制定验收标准和实施方案 |
-| Developer | Cursor CLI（固定 Auto） | 编码、修复、向 Manager 提问 |
-| Tester | Codex CLI（workspace-write） | 执行测试、收集证据、给出质量门结果 |
-| Reviewer | Codex CLI（只读） | 独立复审风险和验收完整性 |
+| Manager | Claude CLI / 你现有的 DeepSeek 后端 | 总牵头、答疑、循环与最终报告 |
+| Planner | Codex CLI（只读） | 仓库分析、计划、验收标准 |
+| Developer | Cursor CLI（`auto`） | 编码与缺陷修复 |
+| Tester | Codex CLI（workspace-write） | 运行检查，为每条验收标准提供证据 |
+| Reviewer | Codex CLI（只读） | 独立检查正确性、回归与风险 |
+| Challenger | MiniMax `mmx`（可选） | 规划前质疑歧义、边界与遗漏 |
+| Researcher | Antigravity `agy`（手动） | 需要时由你在 Antigravity 产品内独立研究 |
+
+Manager 会先把任务分为 `implementation`、`audit` 或 `mixed`。像“检查近三天开发质量”这类审计任务不会被强行制造代码改动。
 
 ## 五分钟开始
 
-macOS 需要 Python 3.10+、Git、`tmux`、`uv`，以及已经登录可用的 `claude`、`cursor-agent`（或 `agent`）、`codex`、`mmx` 和 `agy`。安装脚本会在缺失时安装官方 MiniMax CLI 与 Google Antigravity CLI，但不会替你处理登录凭据。
+macOS 需要 Python 3.10+、Git、`tmux`、`uv`，以及已登录可用的 `claude`、`cursor-agent`（或 `agent`）、`codex` 和 `mmx`。
 
 ```bash
 git clone https://github.com/rambo586/autoagent.git
 cd autoagent
 ./install.sh
 
-# 首次使用 MiniMax 时在本机交互登录
-mmx auth login
-
-# 首次使用 Antigravity 时启动一次并登录 Google AI Pro 对应账号
-agy
-
-# 先做无消耗检查；加 --live 会真实调用五个客户端并消耗少量额度
+mmx auth login                   # 首次使用 MiniMax
 autoagent doctor
-autoagent doctor --live
+autoagent doctor --live          # 会消耗少量模型额度
+autoagent configure              # 交互选择预设、角色和模型
 
 cd /path/to/your/project
 autoagent run "给订单列表增加按状态筛选，并补齐测试"
 ```
 
-提交任务后可以离开终端：
+任务提交后可以离开编排会话：
 
 ```bash
-autoagent status
-autoagent attach
-autoagent report
+autoagent watch                 # 阶段、当前角色、轮次和最近事件
+autoagent status                # 单次快照
+autoagent attach                # 需要时接管 tmux 会话
+autoagent report                # 最终报告
 ```
 
-Web 控制台默认位于 <http://127.0.0.1:9889>。完整本地配置见 [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md)。
+CAO Web 控制台默认位于 <http://127.0.0.1:9889>。
 
-## 执行闭环
+## 模型与角色配置
 
-1. `mmx` 对原始需求做一次只读质疑，建议存入运行目录；失败时默认降级继续。
-2. `agy` 在沙箱无头模式下提供独立研究与架构意见；失败时默认降级继续。
-3. Manager 把需求和两份建议交给 Planner，由 Planner 结合代码库验证，得到结构化计划和验收标准。
-4. Developer 在隔离 worktree 中实现；遇到疑义必须向 Manager 发送澄清请求。
-5. Tester 运行项目测试，并对每条验收标准给出证据。
-6. 测试不通过就回到 Developer，最多循环 3 次；通过后交给 Reviewer 独立复审。
-7. Manager 写入 `final-report.md`。涉及产品取舍、凭据、部署或破坏性操作时，任务标记为 `BLOCKED`，保留现场等待人工决定。
+配置合并规则：
 
-状态和报告默认保存在 `~/.local/share/autoagent/runs/`；代码 worktree 保存在 `~/.local/share/autoagent/worktrees/`。
+1. 全局、项目或本次 `run --preset` 决定使用哪个内置基线，后者的 preset 名优先；
+2. `~/.config/autoagent/config.json` 中的显式字段覆盖基线；
+3. 项目根目录 `.autoagent/config.json` 再覆盖全局显式字段；
+4. 本次 `run --set key=value` 优先级最高。
 
-## 安全边界
+因此 `run --preset fast` 会切换基线，但不会丢掉你显式配置的角色模型；需要临时覆盖时使用 `--set`。
 
-- 默认不读取或复制 Keychain、`~/.ssh`、浏览器 Cookie、API Key 或其他凭据。
-- 默认不 push、不 merge、不创建 PR、不部署；最终分支由你检查后自行处理。
-- Planner 与 Reviewer 使用 Codex `read-only` 沙箱；Tester 使用 `workspace-write` 以允许测试生成缓存和构建产物。
-- Cursor CLI 在 CAO 当前版本中会自动批准工具调用。独立 worktree 防止直接污染原分支，但它不是操作系统级沙箱；只对可信仓库使用。
-- Cursor 的 Live Probe 和 Developer profile 都显式使用 `model: auto`，避免无头任务继承交互会话中的命名模型并触发套餐权限错误。
-- `autoagent stop` 只终止会话，不删除 worktree 或分支，便于恢复和审计。
-- CAO 当前没有原生 `mmx` 或 `agy` provider；v0.1.3 将两者作为有边界的前置顾问，不把它们伪装成可收发 CAO 消息的 worker。
-
-MiniMax 默认模式是 `auto`：可用时调用，失败时继续。可按任务关闭或强制成功：
+`autoagent configure` 是推荐入口。也可以用快捷命令：
 
 ```bash
-AUTOAGENT_MINIMAX=off autoagent run "需求"
-AUTOAGENT_MINIMAX=always autoagent run "需求"
-autoagent minimax quota
+autoagent preset list
+autoagent preset use balanced
+autoagent models list             # 展示生效角色、模型和本机命令状态
+autoagent models doctor           # 对生效配置做真实调用
+
+autoagent role set manager claude
+autoagent role set developer cursor --model auto
+autoagent role set tester codex --model inherit --project
+autoagent role disable reviewer --project
+
+autoagent run --preset fast "修复这个小问题"
+autoagent run --set developer.model=auto --set max_cycles=2 "需求"
 ```
 
-Antigravity 默认模式也是 `auto`：可用时调用，失败时继续。可按任务关闭或强制成功：
+`inherit` 表示沿用对应 CLI 当前配置。Cursor 默认用 `auto`，避免无头任务继承一个当前套餐不可用的命名模型。`models list` 不伪造不同订阅的远端模型目录；最终可用性以 `models doctor` 的真实调用为准。
+
+可以把已安装的 CAO profile 注册为按需专家：
 
 ```bash
-AUTOAGENT_ANTIGRAVITY=off autoagent run "需求"
-AUTOAGENT_ANTIGRAVITY=always autoagent run "需求"
+autoagent specialist add security my_security_profile \
+  --purpose "认证与权限审计" \
+  --when "任务修改认证、权限或敏感数据" \
+  --project
+autoagent specialist list
 ```
 
-## 当前限制（v0.1）
+每次运行会把完整生效配置保存为 `effective-config.json`，并生成独立 CAO profiles；所以报告可以追溯当时真正使用的 provider 和 model。配置文件拒绝 token、secret、password、API key 等凭据字段。
 
-- 先固定五个 CAO 角色和两个前置顾问，暂未自动按任务生成更多专家；后续可加入数据库、安全、UI 等按需角色。
-- Manager 的 DeepSeek 模型映射沿用你的 Claude CLI 配置，AutoAgent 不修改它。
-- 真实 CLI、模型配额和项目测试只能在你的本机验证；仓库 CI 只做静态和契约检查。
-- 运行前要求当前 Git 工作区干净，避免把未提交改动错误地排除在任务上下文外。
+## 内置 presets
+
+| Preset | 最多修复轮次 | MiniMax | 适用场景 |
+|---|---:|---|---|
+| `balanced` | 3 | optional | 日常主力 |
+| `quality` | 4 | optional | 风险更高、允许更多修复 |
+| `fast` | 1 | disabled | 小任务、快速反馈 |
+| `quota-saver` | 2 | disabled | 节省顾问额度 |
+
+## Antigravity 边界
+
+Antigravity 在 v0.2 中只是手动伴侣：`doctor` 可检查 `agy` 是否存在，但 `doctor --live` 和 `run` 都不会后台调用它。Google 明确说明，第三方软件不应使用 Antigravity 消费者登录；如果将来要把 Gemini 自动接入工作流，应改用 Vertex AI 或 AI Studio API Key。见 [Google Antigravity FAQ](https://antigravity.google/docs/faq)。
+
+## 安全边界与限制
+
+- 默认不读取 Keychain、`~/.ssh`、浏览器 Cookie、API Key 或其他凭据。
+- Planner 与 Reviewer 使用 Codex `read-only`；Tester 使用 `workspace-write` 以允许正常缓存和构建产物。
+- Cursor 在 CAO 集成中会自动批准工具调用。独立 worktree 能保护原分支，但不是操作系统级沙箱；只对可信仓库使用。
+- 运行前要求当前 Git 工作区干净。
+- `fallback_policy` 已预留配置字段，v0.2 不会悄悄换用其他模型或供应商。
+- `autoagent stop` 只停止会话，不删除 worktree、分支或运行记录。
+
+本地安装细节见 [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md)，架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 开发
 
 ```bash
 make test
 ```
-
-架构与协议见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。

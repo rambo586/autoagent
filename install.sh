@@ -11,7 +11,7 @@ say() { printf '%s\n' "$*"; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 has() { command -v "$1" >/dev/null 2>&1; }
 
-[[ "$(uname -s)" == "Darwin" ]] || say "提示：v0.1 主要在 macOS 设计；将继续安装。"
+[[ "$(uname -s)" == "Darwin" ]] || say "提示：v0.2 主要在 macOS 设计；将继续安装。"
 has python3 || die "缺少 python3（需要 3.10+）"
 has git || die "缺少 git"
 has curl || die "缺少 curl"
@@ -33,18 +33,13 @@ if ! has mmx; then
   npm install -g mmx-cli
 fi
 
-if ! has agy; then
-  say "安装官方 Google Antigravity CLI..."
-  curl -fsSL https://antigravity.google/cli/install.sh | bash
-  hash -r
-  has agy || die "Antigravity CLI 安装完成但当前 PATH 中未找到 agy；请确认 $HOME/.local/bin 已加入 PATH 后重试"
-fi
-
-mkdir -p "$BIN_DIR" "$SHARE_DIR/profiles" "$SHARE_DIR/schemas" "$HOME/.codex"
+mkdir -p "$BIN_DIR" "$SHARE_DIR/profiles" "$SHARE_DIR/schemas" "$SHARE_DIR/lib" "$SHARE_DIR/config" "$HOME/.codex"
 install -m 0755 "$ROOT_DIR/bin/autoagent" "$BIN_DIR/autoagent"
 install -m 0644 "$ROOT_DIR/VERSION" "$SHARE_DIR/VERSION"
 install -m 0644 "$ROOT_DIR"/profiles/*.md "$SHARE_DIR/profiles/"
 install -m 0644 "$ROOT_DIR"/schemas/*.json "$SHARE_DIR/schemas/"
+install -m 0644 "$ROOT_DIR/lib/autoagent_config.py" "$SHARE_DIR/lib/autoagent_config.py"
+install -m 0644 "$ROOT_DIR/config/default.json" "$SHARE_DIR/config/default.json"
 
 say "安装 CAO profiles..."
 for profile in "$ROOT_DIR"/profiles/*.md; do
@@ -92,4 +87,9 @@ if ! mmx auth status >/dev/null 2>&1; then
   say "MiniMax 尚未登录：请在本机交互执行 mmx auth login"
   say "不要把 API Key 或登录凭据粘贴到聊天或仓库。"
 fi
-say "Antigravity 首次使用请执行 agy，并使用 Google AI Pro 对应账号完成登录。"
+if has agy; then
+  say "Antigravity 已检测到；AutoAgent 只把它作为手动伴侣，不会在后台调用消费者登录。"
+else
+  say "Antigravity 是可选手动伴侣；未安装不影响 AutoAgent 主链路。"
+fi
+say "首次配置角色与模型：autoagent configure"

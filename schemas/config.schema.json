@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rambo586/autoagent/schemas/config.schema.json",
+  "title": "AutoAgent configuration",
+  "type": "object",
+  "required": ["version"],
+  "properties": {
+    "version": {"const": 1},
+    "preset": {"type": "string"},
+    "max_cycles": {"type": "integer", "minimum": 1, "maximum": 20},
+    "fallback_policy": {"enum": ["never", "notify", "ask"]},
+    "roles": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/role"}
+    },
+    "specialists": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/specialist"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "role": {
+      "type": "object",
+      "properties": {
+        "provider": {"type": "string"},
+        "model": {"type": "string"},
+        "mode": {"enum": ["required", "optional", "disabled", "manual"]},
+        "template": {"type": "string"},
+        "profile": {"type": "string"},
+        "codex_profile": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "specialist": {
+      "type": "object",
+      "required": ["name", "profile", "purpose", "when"],
+      "properties": {
+        "name": {"type": "string"},
+        "profile": {"type": "string"},
+        "purpose": {"type": "string"},
+        "when": {"type": "string"},
+        "mode": {"enum": ["optional", "required", "disabled"]}
+      },
+      "additionalProperties": false
+    }
+  }
+}
